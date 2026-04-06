@@ -2,11 +2,23 @@
 
 A modern, full-stack car rental platform built with **React**, **Node.js**, **Express**, and **MySQL**.
 
+## � Quick Start (Automatic)
+
+**Double-click `start-website.bat`** to run everything automatically!
+
+This will:
+- ✅ Start MySQL database
+- ✅ Create database tables
+- ✅ Start backend server (port 5000)
+- ✅ Start frontend React app (port 3000)
+
+**To stop:** Double-click `stop-website.bat`
+
 ## 📋 Table of Contents
 - [Features](#features)
 - [Tech Stack](#tech-stack)
 - [Project Structure](#project-structure)
-- [Installation](#installation)
+- [Manual Installation](#manual-installation)
 - [Running the Application](#running-the-application)
 - [API Endpoints](#api-endpoints)
 - [Usage](#usage)
