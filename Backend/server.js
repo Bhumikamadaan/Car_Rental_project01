@@ -1,6 +1,8 @@
 const express = require('express');
 const mysql = require('mysql2/promise');
 const cors = require('cors');
+const fs = require('fs');
+const path = require('path');
 const { URL } = require('url');
 
 const app = express();
@@ -22,35 +24,33 @@ const normalizeString = (value = '') => String(value).trim();
 const normalizeNumber = (value) => Number(value);
 const usingMemoryStore = () => storageMode === 'memory';
 
-// Demo fallback storage used only when DB is unavailable on cloud.
-const memoryStore = {
-    users: [
-        { id: 1, email: 'demo.customer@swiftrentals.com', password: '123456', role: 'customer' },
-        { id: 2, email: 'demo.agency@swiftrentals.com', password: '123456', role: 'agency' }
-    ],
-    cars: [
-        {
-            id: 1,
-            model_name: 'Toyota Fortuner',
-            vehicle_number: 'HR26BK9999',
-            seating_capacity: 7,
-            rent_per_day: 4000,
-            agency_email: 'demo.agency@swiftrentals.com',
-            image_url: 'https://imgd.aeplcdn.com/664x374/n/cw/ec/44709/fortuner-exterior-right-front-three-quarter-20.jpeg',
-            created_at: new Date().toISOString()
-        },
-        {
-            id: 2,
-            model_name: 'Mahindra Scorpio-N',
-            vehicle_number: 'DL01SC0001',
-            seating_capacity: 7,
-            rent_per_day: 2800,
-            agency_email: 'demo.agency@swiftrentals.com',
-            image_url: 'https://imgd.aeplcdn.com/664x374/n/cw/ec/124839/scorpio-n-exterior-right-front-three-quarter-15.jpeg',
-            created_at: new Date().toISOString()
-        }
-    ],
+const defaultFallbackData = {
+    users: [],
+    cars: [],
     bookings: []
+};
+
+const loadFallbackData = () => {
+    try {
+        const fallbackPath = path.join(__dirname, 'fallback-data.json');
+        const raw = fs.readFileSync(fallbackPath, 'utf8');
+        const parsed = JSON.parse(raw);
+        return {
+            users: Array.isArray(parsed.users) ? parsed.users : [],
+            cars: Array.isArray(parsed.cars) ? parsed.cars : [],
+            bookings: Array.isArray(parsed.bookings) ? parsed.bookings : []
+        };
+    } catch (err) {
+        console.warn('Could not load fallback-data.json. Using empty fallback storage.');
+        return defaultFallbackData;
+    }
+};
+
+const fallbackData = loadFallbackData();
+const memoryStore = {
+    users: fallbackData.users,
+    cars: fallbackData.cars,
+    bookings: fallbackData.bookings
 };
 
 const nextMemoryId = (rows) => (rows.length ? Math.max(...rows.map((r) => Number(r.id) || 0)) + 1 : 1);

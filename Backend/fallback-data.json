@@ -1,0 +1,162 @@
+{
+  "users": [
+    {
+      "id": 1,
+      "email": "bhumikamadaan06@gmail.com",
+      "password": "bhumika@06",
+      "role": "customer"
+    },
+    {
+      "id": 2,
+      "email": "test@test.com",
+      "password": "test123",
+      "role": "customer"
+    },
+    {
+      "id": 6,
+      "email": "newuser@test.com",
+      "password": "abc123",
+      "role": "customer"
+    },
+    {
+      "id": 8,
+      "email": "bhumika22csu284@ncuindia.edu",
+      "password": "Bhumika@06",
+      "role": "agency"
+    },
+    {
+      "id": 9,
+      "email": "agencyrental@gmail.com",
+      "password": "Agency@4242",
+      "role": "agency"
+    }
+  ],
+  "cars": [
+    {
+      "id": 5,
+      "model_name": "Mahindra Thar",
+      "vehicle_number": "PB 65 AS 4321",
+      "seating_capacity": 4,
+      "rent_per_day": 3500,
+      "agency_email": "agencyrental@gmail.com",
+      "image_url": "https://imgd.aeplcdn.com/664x374/n/cw/ec/40087/thar-exterior-right-front-three-quarter-35.jpeg",
+      "created_at": "2026-04-06T09:03:19.000Z"
+    },
+    {
+      "id": 6,
+      "model_name": "Toyota Camry",
+      "vehicle_number": "MH12AB1234",
+      "seating_capacity": 5,
+      "rent_per_day": 1500,
+      "agency_email": "agencyrental@gmail.com",
+      "image_url": "https://images.unsplash.com/photo-1621007947382-bb3c3994e3fb?w=400",
+      "created_at": "2026-04-06T09:03:19.000Z"
+    },
+    {
+      "id": 7,
+      "model_name": "Honda Civic",
+      "vehicle_number": "DL01XY5678",
+      "seating_capacity": 5,
+      "rent_per_day": 1200,
+      "agency_email": "agencyrental@gmail.com",
+      "image_url": "https://images.unsplash.com/photo-1606664515524-ed2f786a0bd6?w=400",
+      "created_at": "2026-04-06T09:03:19.000Z"
+    },
+    {
+      "id": 8,
+      "model_name": "Mahindra Scorpio",
+      "vehicle_number": "KA05PQ9012",
+      "seating_capacity": 7,
+      "rent_per_day": 1800,
+      "agency_email": "agencyrental@gmail.com",
+      "image_url": "https://cdn-s3.autocarindia.com/legacy/cdni/Galleries/20220630103423_20220630101647_Scorpio_15.jpg?q=75&w=640",
+      "created_at": "2026-04-06T09:03:19.000Z"
+    },
+    {
+      "id": 11,
+      "model_name": "Mercedes-Benz C-Class",
+      "vehicle_number": "DL 01 CP 0001",
+      "seating_capacity": 5,
+      "rent_per_day": 12000,
+      "agency_email": "agencyrental@gmail.com",
+      "image_url": "https://images.unsplash.com/photo-1618843479313-40f8afb4b4d8?q=80&w=400",
+      "created_at": "2026-04-06T09:03:19.000Z"
+    },
+    {
+      "id": 13,
+      "model_name": "Tesla Model 3",
+      "vehicle_number": "MH 02 EV 9999",
+      "seating_capacity": 5,
+      "rent_per_day": 15000,
+      "agency_email": "agencyrental@gmail.com",
+      "image_url": "https://images.unsplash.com/photo-1560958089-b8a1929cea89?q=80&w=400",
+      "created_at": "2026-04-06T09:03:19.000Z"
+    },
+    {
+      "id": 15,
+      "model_name": "Ford Mustang GT",
+      "vehicle_number": "HR 26 GT 0007",
+      "seating_capacity": 4,
+      "rent_per_day": 25000,
+      "agency_email": "agencyrental@gmail.com",
+      "image_url": "https://images.unsplash.com/photo-1584345604476-8ec5e12e42dd?q=80&w=400",
+      "created_at": "2026-04-06T09:03:19.000Z"
+    },
+    {
+      "id": 17,
+      "model_name": "Toyota Fortuner",
+      "vehicle_number": "DL02CD5678",
+      "seating_capacity": 7,
+      "rent_per_day": 3500,
+      "agency_email": "agency@example.com",
+      "image_url": "https://imgd.aeplcdn.com/664x374/n/cw/ec/44709/fortuner-exterior-right-front-three-quarter-20.jpeg",
+      "created_at": "2026-04-06T09:33:20.000Z"
+    }
+  ],
+  "bookings": [
+    {
+      "id": 1,
+      "car_id": 13,
+      "customer_email": "bhumikamadaan06@gmail.com",
+      "agency_email": "agencyrental@gmail.com",
+      "start_date": "2026-04-05T18:30:00.000Z",
+      "number_of_days": 4,
+      "total_price": "60000.00",
+      "status": "confirmed",
+      "created_at": "2026-04-05T19:39:51.000Z"
+    },
+    {
+      "id": 3,
+      "car_id": 13,
+      "customer_email": "bhumikamadaan06@gmail.com",
+      "agency_email": "agencyrental@gmail.com",
+      "start_date": "2026-04-08T18:30:00.000Z",
+      "number_of_days": 6,
+      "total_price": "90000.00",
+      "status": "confirmed",
+      "created_at": "2026-04-05T19:58:44.000Z"
+    },
+    {
+      "id": 4,
+      "car_id": 5,
+      "customer_email": "bhumikamadaan06@gmail.com",
+      "agency_email": "agencyrental@gmail.com",
+      "start_date": "2026-04-09T18:30:00.000Z",
+      "number_of_days": 2,
+      "total_price": "7000.00",
+      "status": "confirmed",
+      "created_at": "2026-04-05T20:06:16.000Z"
+    },
+    {
+      "id": 5,
+      "car_id": 15,
+      "customer_email": "bhumika22csu284@ncuindia.edu",
+      "agency_email": "agencyrental@gmail.com",
+      "start_date": "2026-04-15T18:30:00.000Z",
+      "number_of_days": 1,
+      "total_price": "25000.00",
+      "status": "confirmed",
+      "created_at": "2026-04-06T09:11:20.000Z"
+    }
+  ]
+}
