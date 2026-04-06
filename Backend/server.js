@@ -1,19 +1,17 @@
 const express = require('express');
 const mysql = require('mysql2/promise');
 const cors = require('cors');
-const http = require('http');
-const WebSocket = require('ws');
 const { URL } = require('url');
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-const server = http.createServer(app);
-const wss = new WebSocket.Server({ server });
 const PORT = Number(process.env.PORT || 5000);
+const isVercelRuntime = process.env.VERCEL === '1' || Boolean(process.env.VERCEL_URL);
 
 let poolReady = false;
+let storageMode = 'mysql';
 const allowedRoles = new Set(['customer', 'agency']);
 
 // --- HELPER FUNCTIONS ---
@@ -22,6 +20,40 @@ const normalizeEmail = (value = '') => String(value).trim().toLowerCase();
 const normalizeRole = (role) => (allowedRoles.has(role) ? role : 'customer');
 const normalizeString = (value = '') => String(value).trim();
 const normalizeNumber = (value) => Number(value);
+const usingMemoryStore = () => storageMode === 'memory';
+
+// Demo fallback storage used only when DB is unavailable on cloud.
+const memoryStore = {
+    users: [
+        { id: 1, email: 'demo.customer@swiftrentals.com', password: '123456', role: 'customer' },
+        { id: 2, email: 'demo.agency@swiftrentals.com', password: '123456', role: 'agency' }
+    ],
+    cars: [
+        {
+            id: 1,
+            model_name: 'Toyota Fortuner',
+            vehicle_number: 'HR26BK9999',
+            seating_capacity: 7,
+            rent_per_day: 4000,
+            agency_email: 'demo.agency@swiftrentals.com',
+            image_url: 'https://imgd.aeplcdn.com/664x374/n/cw/ec/44709/fortuner-exterior-right-front-three-quarter-20.jpeg',
+            created_at: new Date().toISOString()
+        },
+        {
+            id: 2,
+            model_name: 'Mahindra Scorpio-N',
+            vehicle_number: 'DL01SC0001',
+            seating_capacity: 7,
+            rent_per_day: 2800,
+            agency_email: 'demo.agency@swiftrentals.com',
+            image_url: 'https://imgd.aeplcdn.com/664x374/n/cw/ec/124839/scorpio-n-exterior-right-front-three-quarter-15.jpeg',
+            created_at: new Date().toISOString()
+        }
+    ],
+    bookings: []
+};
+
+const nextMemoryId = (rows) => (rows.length ? Math.max(...rows.map((r) => Number(r.id) || 0)) + 1 : 1);
 
 const getDbConfigFromEnv = () => {
     const databaseUrl = normalizeString(process.env.DATABASE_URL);
@@ -130,6 +162,9 @@ async function initializeDatabase() {
         poolReady = true;
     } catch (err) {
         console.log('Database Initialization Error:', err.message);
+        storageMode = 'memory';
+        poolReady = true;
+        console.log('Running in memory fallback mode (demo data).');
     } finally {
         if (db) db.release();
     }
@@ -151,6 +186,36 @@ app.post('/login', async (req, res) => {
     const hasSelectedRole = selectedRoleRaw.length > 0;
     const selectedRole = hasSelectedRole ? normalizeRole(selectedRoleRaw.toLowerCase()) : null;
     try {
+        if (usingMemoryStore()) {
+            const matchedUser = memoryStore.users.find((u) => {
+                const sameEmail = normalizeEmail(u.email) === email;
+                const samePassword = normalizeString(u.password) === password;
+                const roleMatches = !hasSelectedRole || normalizeRole(normalizeString(u.role).toLowerCase()) === selectedRole;
+                return sameEmail && samePassword && roleMatches;
+            });
+
+            if (matchedUser) {
+                return res.send({
+                    message: 'Login successful',
+                    user: { id: matchedUser.id, email: matchedUser.email, role: normalizeRole(matchedUser.role) }
+                });
+            }
+
+            if (hasSelectedRole) {
+                const credentialMatch = memoryStore.users.find(
+                    (u) => normalizeEmail(u.email) === email && normalizeString(u.password) === password
+                );
+
+                if (credentialMatch) {
+                    return res.status(403).send({
+                        error: `This account is registered as ${credentialMatch.role}. Please select the correct role.`
+                    });
+                }
+            }
+
+            return res.status(401).send({ error: 'Invalid credentials' });
+        }
+
         const loginSql = hasSelectedRole
             ? 'SELECT id, email, role FROM users WHERE LOWER(email) = LOWER(?) AND password = ? AND LOWER(role) = LOWER(?) LIMIT 1'
             : 'SELECT id, email, role FROM users WHERE LOWER(email) = LOWER(?) AND password = ? LIMIT 1';
@@ -183,6 +248,15 @@ app.post('/register', async (req, res) => {
     const password = normalizeString(req.body?.password);
     const role = normalizeRole(req.body?.role);
     try {
+        if (usingMemoryStore()) {
+            const exists = memoryStore.users.some((u) => normalizeEmail(u.email) === email);
+            if (exists) return res.status(409).send({ error: 'Email already exists' });
+
+            const newUser = { id: nextMemoryId(memoryStore.users), email, password, role };
+            memoryStore.users.push(newUser);
+            return res.send({ message: 'Registration successful' });
+        }
+
         await pool.execute('INSERT INTO users (email, password, role) VALUES (?, ?, ?)', [email, password, role]);
         res.send({ message: 'Registration successful' });
     } catch (err) {
@@ -195,6 +269,11 @@ app.post('/register', async (req, res) => {
 // Get All Cars (For Customer Home)
 app.get(['/api/cars', '/cars'], async (req, res) => {
     try {
+        if (usingMemoryStore()) {
+            const result = [...memoryStore.cars].sort((a, b) => Number(b.id) - Number(a.id));
+            return res.send(result);
+        }
+
         // Use id for ordering so legacy tables (without created_at) also work.
         const [result] = await pool.execute('SELECT * FROM cars ORDER BY id DESC');
         res.send(result);
@@ -208,6 +287,11 @@ app.get(['/api/cars', '/cars'], async (req, res) => {
 app.get('/api/agency/cars/:email', async (req, res) => {
     const email = normalizeEmail(req.params.email);
     try {
+        if (usingMemoryStore()) {
+            const result = memoryStore.cars.filter((car) => normalizeEmail(car.agency_email) === email);
+            return res.send(result);
+        }
+
         const [result] = await pool.execute('SELECT * FROM cars WHERE LOWER(agency_email) = LOWER(?)', [email]);
         res.send(result);
     } catch (err) { res.status(500).send({ error: 'Database error' }); }
@@ -217,6 +301,27 @@ app.get('/api/agency/cars/:email', async (req, res) => {
 app.post(['/api/add-car', '/add-car'], async (req, res) => {
     const { model_name, vehicle_number, seating_capacity, rent_per_day, agency_email, image_url } = req.body;
     try {
+        if (usingMemoryStore()) {
+            const normalizedVehicle = normalizeString(vehicle_number).toUpperCase();
+            const alreadyExists = memoryStore.cars.some(
+                (car) => normalizeString(car.vehicle_number).toUpperCase() === normalizedVehicle
+            );
+
+            if (alreadyExists) return res.status(409).send({ error: 'Vehicle number already exists' });
+
+            memoryStore.cars.push({
+                id: nextMemoryId(memoryStore.cars),
+                model_name: normalizeString(model_name),
+                vehicle_number: normalizedVehicle,
+                seating_capacity: normalizeNumber(seating_capacity),
+                rent_per_day: normalizeNumber(rent_per_day),
+                agency_email: normalizeEmail(agency_email),
+                image_url,
+                created_at: new Date().toISOString()
+            });
+            return res.status(201).send({ message: 'Car added successfully' });
+        }
+
         await pool.execute(
             'INSERT INTO cars (model_name, vehicle_number, seating_capacity, rent_per_day, agency_email, image_url) VALUES (?, ?, ?, ?, ?, ?)',
             [
@@ -237,6 +342,13 @@ app.post(['/api/add-car', '/add-car'], async (req, res) => {
 // Delete Car
 app.delete('/api/cars/:id', async (req, res) => {
     try {
+        if (usingMemoryStore()) {
+            const targetId = Number(req.params.id);
+            memoryStore.cars = memoryStore.cars.filter((car) => Number(car.id) !== targetId);
+            memoryStore.bookings = memoryStore.bookings.filter((booking) => Number(booking.car_id) !== targetId);
+            return res.send({ message: 'Car and associated bookings deleted' });
+        }
+
         await pool.execute('DELETE FROM cars WHERE id = ?', [req.params.id]);
         res.send({ message: 'Car and associated bookings deleted' });
     } catch (err) { res.status(500).send({ error: 'Delete failed' }); }
@@ -248,6 +360,25 @@ app.delete('/api/cars/:id', async (req, res) => {
 app.post('/api/bookings', async (req, res) => {
     const { car_id, customer_email, start_date, number_of_days } = req.body;
     try {
+        if (usingMemoryStore()) {
+            const selectedCar = memoryStore.cars.find((car) => Number(car.id) === Number(car_id));
+            if (!selectedCar) return res.status(404).send({ error: 'Car not found' });
+
+            const totalPrice = Number(selectedCar.rent_per_day) * Number(number_of_days);
+            memoryStore.bookings.push({
+                id: nextMemoryId(memoryStore.bookings),
+                car_id: Number(selectedCar.id),
+                customer_email: normalizeEmail(customer_email),
+                agency_email: normalizeEmail(selectedCar.agency_email),
+                start_date,
+                number_of_days: normalizeNumber(number_of_days),
+                total_price: totalPrice,
+                status: 'confirmed',
+                created_at: new Date().toISOString()
+            });
+            return res.status(201).send({ message: 'Car booked successfully!' });
+        }
+
         const [[car]] = await pool.execute('SELECT * FROM cars WHERE id = ?', [car_id]);
         if (!car) return res.status(404).send({ error: 'Car not found' });
 
@@ -276,6 +407,24 @@ app.get(['/api/bookings/agency/:email', '/api/bookings/customer/:email'], async 
     const isAgency = req.path.includes('/agency/');
     
     try {
+        if (usingMemoryStore()) {
+            const scopedBookings = memoryStore.bookings
+                .filter((booking) => {
+                    const field = isAgency ? booking.agency_email : booking.customer_email;
+                    return normalizeEmail(field) === email;
+                })
+                .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+                .map((booking) => {
+                    const car = memoryStore.cars.find((item) => Number(item.id) === Number(booking.car_id));
+                    return {
+                        ...booking,
+                        model_name: car?.model_name || 'Car Deleted',
+                        vehicle_number: car?.vehicle_number || 'N/A'
+                    };
+                });
+            return res.send(scopedBookings);
+        }
+
         const [result] = await pool.execute(
             `SELECT 
                 b.*, 
@@ -295,11 +444,21 @@ app.get(['/api/bookings/agency/:email', '/api/bookings/customer/:email'], async 
 });
 
 // Health Check
-app.get('/api/health', (req, res) => res.send({ status: 'OK', dbConnected: poolReady }));
+app.get('/api/health', (req, res) =>
+    res.send({
+        status: 'OK',
+        dbConnected: poolReady && !usingMemoryStore(),
+        storageMode
+    })
+);
 
 // Debug route to show users
 app.get('/api/debug/users', async (req, res) => {
     try {
+        if (usingMemoryStore()) {
+            return res.send(memoryStore.users.map((u) => ({ id: u.id, email: u.email, role: u.role })));
+        }
+
         const [result] = await pool.execute('SELECT id, email, role FROM users ORDER BY id');
         res.send(result);
     } catch (err) {
@@ -307,4 +466,8 @@ app.get('/api/debug/users', async (req, res) => {
     }
 });
 
-server.listen(PORT, () => console.log(`🚀 Server running on http://localhost:${PORT}`));
+if (!isVercelRuntime) {
+    app.listen(PORT, () => console.log(`🚀 Server running on http://localhost:${PORT}`));
+}
+
+module.exports = app;
