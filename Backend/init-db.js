@@ -1,12 +1,36 @@
 const mysql = require('mysql2/promise');
+const { URL } = require('url');
 
-const dbConfig = {
-    host: process.env.DB_HOST || '127.0.0.1',
-    port: Number(process.env.DB_PORT || 3307),
-    user: process.env.DB_USER || 'root',
-    password: process.env.DB_PASSWORD || '',
-    database: process.env.DB_NAME || 'car_agency_db'
+const normalizeString = (value = '') => String(value).trim();
+
+const getDbConfigFromEnv = () => {
+    const databaseUrl = normalizeString(process.env.DATABASE_URL);
+
+    if (databaseUrl) {
+        try {
+            const parsed = new URL(databaseUrl);
+            return {
+                host: parsed.hostname,
+                port: Number(parsed.port || 3306),
+                user: decodeURIComponent(parsed.username || ''),
+                password: decodeURIComponent(parsed.password || ''),
+                database: decodeURIComponent((parsed.pathname || '/').replace('/', '')) || 'car_agency_db'
+            };
+        } catch (err) {
+            console.warn('Invalid DATABASE_URL detected. Falling back to individual DB env vars.');
+        }
+    }
+
+    return {
+        host: process.env.DB_HOST || process.env.MYSQLHOST || '127.0.0.1',
+        port: Number(process.env.DB_PORT || process.env.MYSQLPORT || 3307),
+        user: process.env.DB_USER || process.env.MYSQLUSER || 'root',
+        password: process.env.DB_PASSWORD || process.env.MYSQLPASSWORD || '',
+        database: process.env.DB_NAME || process.env.MYSQLDATABASE || 'car_agency_db'
+    };
 };
+
+const dbConfig = getDbConfigFromEnv();
 
 async function initDatabase() {
     let connection;

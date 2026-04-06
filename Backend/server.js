@@ -3,6 +3,7 @@ const mysql = require('mysql2/promise');
 const cors = require('cors');
 const http = require('http');
 const WebSocket = require('ws');
+const { URL } = require('url');
 
 const app = express();
 app.use(cors());
@@ -22,13 +23,41 @@ const normalizeRole = (role) => (allowedRoles.has(role) ? role : 'customer');
 const normalizeString = (value = '') => String(value).trim();
 const normalizeNumber = (value) => Number(value);
 
+const getDbConfigFromEnv = () => {
+    const databaseUrl = normalizeString(process.env.DATABASE_URL);
+
+    if (databaseUrl) {
+        try {
+            const parsed = new URL(databaseUrl);
+            return {
+                host: parsed.hostname,
+                port: Number(parsed.port || 3306),
+                user: decodeURIComponent(parsed.username || ''),
+                password: decodeURIComponent(parsed.password || ''),
+                database: decodeURIComponent((parsed.pathname || '/').replace('/', '')) || 'car_agency_db'
+            };
+        } catch (err) {
+            console.warn('Invalid DATABASE_URL detected. Falling back to individual DB env vars.');
+        }
+    }
+
+    return {
+        host: process.env.DB_HOST || process.env.MYSQLHOST || '127.0.0.1',
+        port: Number(process.env.DB_PORT || process.env.MYSQLPORT || 3307),
+        user: process.env.DB_USER || process.env.MYSQLUSER || 'root',
+        password: process.env.DB_PASSWORD || process.env.MYSQLPASSWORD || '',
+        database: process.env.DB_NAME || process.env.MYSQLDATABASE || 'car_agency_db'
+    };
+};
+
 // --- DATABASE CONNECTION ---
+const dbConfig = getDbConfigFromEnv();
 const pool = mysql.createPool({
-    host: process.env.DB_HOST || '127.0.0.1',
-    port: Number(process.env.DB_PORT || 3307), // Aapka port 3307 hai as per previous chat
-    user: process.env.DB_USER || 'root',
-    password: process.env.DB_PASSWORD || '',
-    database: process.env.DB_NAME || 'car_agency_db',
+    host: dbConfig.host,
+    port: dbConfig.port,
+    user: dbConfig.user,
+    password: dbConfig.password,
+    database: dbConfig.database,
     waitForConnections: true,
     connectionLimit: 10,
     queueLimit: 0
