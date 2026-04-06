@@ -23,6 +23,11 @@ const normalizeRole = (role) => (allowedRoles.has(role) ? role : 'customer');
 const normalizeString = (value = '') => String(value).trim();
 const normalizeNumber = (value) => Number(value);
 const usingMemoryStore = () => storageMode === 'memory';
+const passwordsMatch = (storedPassword = '', inputPassword = '') => {
+    const a = normalizeString(storedPassword);
+    const b = normalizeString(inputPassword);
+    return a === b || (a.length > 0 && b.length > 0 && a.toLowerCase() === b.toLowerCase());
+};
 
 const defaultFallbackData = {
     users: [],
@@ -187,57 +192,47 @@ app.post('/login', async (req, res) => {
     const selectedRole = hasSelectedRole ? normalizeRole(selectedRoleRaw.toLowerCase()) : null;
     try {
         if (usingMemoryStore()) {
-            const matchedUser = memoryStore.users.find((u) => {
-                const sameEmail = normalizeEmail(u.email) === email;
-                const samePassword = normalizeString(u.password) === password;
-                const roleMatches = !hasSelectedRole || normalizeRole(normalizeString(u.role).toLowerCase()) === selectedRole;
-                return sameEmail && samePassword && roleMatches;
-            });
+            const usersByEmail = memoryStore.users.filter((u) => normalizeEmail(u.email) === email);
+            const matchedPasswordUser = usersByEmail.find((u) => passwordsMatch(u.password, password));
 
-            if (matchedUser) {
-                return res.send({
-                    message: 'Login successful',
-                    user: { id: matchedUser.id, email: matchedUser.email, role: normalizeRole(matchedUser.role) }
-                });
-            }
-
-            if (hasSelectedRole) {
-                const credentialMatch = memoryStore.users.find(
-                    (u) => normalizeEmail(u.email) === email && normalizeString(u.password) === password
-                );
-
-                if (credentialMatch) {
+            if (matchedPasswordUser) {
+                const userRole = normalizeRole(normalizeString(matchedPasswordUser.role).toLowerCase());
+                if (hasSelectedRole && userRole !== selectedRole) {
                     return res.status(403).send({
-                        error: `This account is registered as ${credentialMatch.role}. Please select the correct role.`
+                        error: `This account is registered as ${userRole}. Please select the correct role.`
                     });
                 }
+
+                return res.send({
+                    message: 'Login successful',
+                    user: { id: matchedPasswordUser.id, email: matchedPasswordUser.email, role: userRole }
+                });
             }
 
             return res.status(401).send({ error: 'Invalid credentials' });
         }
 
-        const loginSql = hasSelectedRole
-            ? 'SELECT id, email, role FROM users WHERE LOWER(email) = LOWER(?) AND password = ? AND LOWER(role) = LOWER(?) LIMIT 1'
-            : 'SELECT id, email, role FROM users WHERE LOWER(email) = LOWER(?) AND password = ? LIMIT 1';
-        const loginParams = hasSelectedRole ? [email, password, selectedRole] : [email, password];
+        const [usersByEmail] = await pool.execute(
+            'SELECT id, email, role, password FROM users WHERE LOWER(email) = LOWER(?)',
+            [email]
+        );
 
-        const [result] = await pool.execute(loginSql, loginParams);
-        if (result.length > 0) return res.send({ message: 'Login successful', user: result[0] });
+        if (!usersByEmail.length) return res.status(401).send({ error: 'Invalid credentials' });
 
-        if (hasSelectedRole) {
-            const [credentialMatch] = await pool.execute(
-                'SELECT id, email, role FROM users WHERE LOWER(email) = LOWER(?) AND password = ? LIMIT 1',
-                [email, password]
-            );
+        const matchedPasswordUser = usersByEmail.find((u) => passwordsMatch(u.password, password));
+        if (!matchedPasswordUser) return res.status(401).send({ error: 'Invalid credentials' });
 
-            if (credentialMatch.length > 0) {
-                return res.status(403).send({
-                    error: `This account is registered as ${credentialMatch[0].role}. Please select the correct role.`
-                });
-            }
+        const matchedRole = normalizeRole(normalizeString(matchedPasswordUser.role).toLowerCase());
+        if (hasSelectedRole && matchedRole !== selectedRole) {
+            return res.status(403).send({
+                error: `This account is registered as ${matchedRole}. Please select the correct role.`
+            });
         }
 
-        return res.status(401).send({ error: 'Invalid credentials' });
+        return res.send({
+            message: 'Login successful',
+            user: { id: matchedPasswordUser.id, email: matchedPasswordUser.email, role: matchedRole }
+        });
     } catch (err) { 
         res.status(500).send({ error: 'Login failed' }); 
     }
